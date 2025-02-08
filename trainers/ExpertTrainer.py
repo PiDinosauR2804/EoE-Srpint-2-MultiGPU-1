@@ -133,7 +133,7 @@ class ExpertTrainer:
                 self.optimizer.zero_grad()
 
                 inputs = {k: v.to(self.args.device) for k, v in inputs.items()}
-                outputs = model(**inputs)
+                outputs = model.module(**inputs)
                 loss = outputs.loss
                 loss.backward()
                 nn.utils.clip_grad_norm_(model.module.parameters(), self.args.max_grad_norm)
@@ -171,7 +171,7 @@ class ExpertTrainer:
             labels = inputs.pop('labels')
             inputs = {k: v.to(self.args.device) for k, v in inputs.items()}
 
-            outputs = model(**inputs)
+            outputs = model.module(**inputs)
 
             logits = outputs.logits
 
