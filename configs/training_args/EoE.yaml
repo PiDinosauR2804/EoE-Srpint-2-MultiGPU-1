@@ -12,7 +12,7 @@ trainer_name: "EoETrainer"
 learning_rate: 5e-4
 classifier_learning_rate: 0.03
 num_train_epochs: 5
-train_batch_size: 16
+train_batch_size: 32
 debug: false
 device: "cuda:0"
 columns:

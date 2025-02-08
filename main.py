@@ -117,6 +117,10 @@ def main(cfg: DictConfig):
             model = nn.DataParallel(model)
         
         model.to(args.device)
+        
+        if isinstance(model, torch.nn.DataParallel):
+            print("Using GPUs:", model.device_ids)  # Xem danh sách GPU được sử dụng
+
 
         trainer = task_to_trainer[args.trainer_name](args=args)
 
