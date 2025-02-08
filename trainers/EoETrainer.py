@@ -51,10 +51,10 @@ class EoETrainer(BaseTrainer):
             train_dataset = BaseDataset(train_data)
             
             for cur_label in cur_labels:
-                model.module.take_generate_description_MrLinh_from_file(cur_label, data.label2id[cur_label], self.args.dataset_name, tokenizer)
+                model.take_generate_description_MrLinh_from_file(cur_label, data.label2id[cur_label], self.args.dataset_name, tokenizer)
 
-            pool = model.module.get_description_ids(cur_labels)
-            old_pool = model.module.get_description_ids(seen_labels)
+            pool = model.get_description_ids(cur_labels)
+            old_pool = model.get_description_ids(seen_labels)
             train_data_have_des = data.filter_and_add_desciption_and_old_description(cur_labels, pool, seen_labels, old_pool) 
             
             num_train_labels = len(cur_labels)
@@ -66,11 +66,11 @@ class EoETrainer(BaseTrainer):
             )
             aug_train_dataset = BaseDataset(aug_train_data)            
             
-            model.module.new_task(num_train_labels)
+            model.new_task(num_train_labels)
 
             if self.task_idx == 0:
                 expert_model = f"./ckpt/{self.args.dataset_name}_{seed}_{self.args.augment_type}.pth"
-                model.module.load_expert_model(expert_model)
+                model.load_expert_model(expert_model)
                 logger.info(f"load first task model from {expert_model}")
             else:
                 self.train(
@@ -80,12 +80,12 @@ class EoETrainer(BaseTrainer):
                 )
 
             os.makedirs(f"./ckpt/{self.args.dataset_name}-{seed}-{self.args.augment_type}", exist_ok=True)
-            model.module.save_classifier(
+            model.save_classifier(
                 idx=self.task_idx,
                 save_dir=f"./ckpt/{self.args.dataset_name}-{seed}-{self.args.augment_type}",
             )
 
-            model.module.feature_extractor.save_and_load_all_adapters(
+            model.feature_extractor.save_and_load_all_adapters(
                 self.task_idx,
                 save_dir=f"./ckpt/{self.args.dataset_name}-{seed}-{self.args.augment_type}",
                 save=True,
@@ -125,7 +125,7 @@ class EoETrainer(BaseTrainer):
 
         # save distribution
         save_data = {
-            "distribution": model.module.expert_distribution,
+            "distribution": model.expert_distribution,
             "seen_labels": seen_labels,
             "label2id": data.label2id,
         }
@@ -159,25 +159,25 @@ class EoETrainer(BaseTrainer):
 
         no_decay = ["bias", "LayerNorm.weight"]
         parameters = [
-            {'params': [p for n, p in model.module.named_parameters() if 'feature_extractor' in n and not any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in model.named_parameters() if 'feature_extractor' in n and not any(nd in n for nd in no_decay)],
              'lr': self.args.learning_rate, 'weight_decay': 1e-2},
-            {'params': [p for n, p in model.module.named_parameters() if 'feature_extractor' in n and any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in model.named_parameters() if 'feature_extractor' in n and any(nd in n for nd in no_decay)],
              'lr': self.args.learning_rate, 'weight_decay': 0.0},
-            {'params': [p for n, p in model.module.named_parameters() if 'feature_extractor' not in n and not any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in model.named_parameters() if 'feature_extractor' not in n and not any(nd in n for nd in no_decay)],
              'lr': self.args.classifier_learning_rate, 'weight_decay': 1e-2},
-            {'params': [p for n, p in model.module.named_parameters() if 'feature_extractor' not in n and any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in model.named_parameters() if 'feature_extractor' not in n and any(nd in n for nd in no_decay)],
              'lr': self.args.classifier_learning_rate, 'weight_decay': 0.0},
         ]
         self.optimizer = AdamW(parameters)
 
         progress_bar = tqdm(range(max_steps))
-        for name, param in model.module.named_parameters():
+        for name, param in model.named_parameters():
             if param.requires_grad and "lora_" in name:
                 print(name)
                 break
 
         for epoch in range(self.args.num_train_epochs):
-            model.module.train()
+            model.train()
             for step, inputs in enumerate(train_dataloader):
                 self.optimizer.zero_grad()
 
@@ -185,7 +185,7 @@ class EoETrainer(BaseTrainer):
                 outputs = model(**inputs)
                 loss = outputs.loss
                 loss.backward()
-                nn.utils.clip_grad_norm_(model.module.parameters(), self.args.max_grad_norm)
+                nn.utils.clip_grad_norm_(model.parameters(), self.args.max_grad_norm)
 
                 self.optimizer.step()
 
@@ -219,7 +219,7 @@ class EoETrainer(BaseTrainer):
         expert_task_preds = []
         expert_class_preds = []
         hits = 0
-        model.module.eval()
+        model.eval()
         for step, inputs in enumerate(eval_dataloader):
 
             inputs = {k: v.to(self.args.device) for k, v in inputs.items()}
@@ -271,7 +271,7 @@ class EoETrainer(BaseTrainer):
     def statistic(self, model, dataset, data_collator):
         for i in range(-1, self.task_idx + 1):
             mean, cov, task_mean, task_cov = self.get_mean_and_cov(model, dataset, data_collator, i)
-            model.module.new_statistic(mean, cov, task_mean, task_cov, i)
+            model.new_statistic(mean, cov, task_mean, task_cov, i)
 
     @torch.no_grad()
     def get_mean_and_cov(self, model, dataset, data_collator, expert_id=0):
@@ -281,7 +281,7 @@ class EoETrainer(BaseTrainer):
             shuffle=False,
             collate_fn=data_collator,
         )
-        model.module.eval()
+        model.eval()
 
         prelogits = []
         labels = []

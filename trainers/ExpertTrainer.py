@@ -56,7 +56,7 @@ class ExpertTrainer:
             )
             train_dataset = BaseDataset(train_data)
 
-            model.module.new_task(num_train_labels)
+            model.new_task(num_train_labels)
 
             self.train(
                 model=model,
@@ -76,7 +76,7 @@ class ExpertTrainer:
             save_model_name = f"{self.args.dataset_name}_{seed}_{self.args.augment_type}.pth"
             save_model_path = os.path.join(self.args.save_model_dir, save_model_name)
             logger.info(f"save expert model to {save_model_path}")
-            self.save_model(model.module, save_model_path)
+            self.save_model(model, save_model_path)
 
             all_cur_acc[self.task_idx] = cur_result
             all_total_acc[self.task_idx] = cur_result
@@ -110,33 +110,33 @@ class ExpertTrainer:
 
         no_decay = ["bias", "LayerNorm.weight"]
         parameters = [
-            {'params': [p for n, p in model.module.named_parameters() if 'feature_extractor' in n and not any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in model.named_parameters() if 'feature_extractor' in n and not any(nd in n for nd in no_decay)],
              'lr': self.args.learning_rate, 'weight_decay': 1e-2},
-            {'params': [p for n, p in model.module.named_parameters() if 'feature_extractor' in n and any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in model.named_parameters() if 'feature_extractor' in n and any(nd in n for nd in no_decay)],
              'lr': self.args.learning_rate, 'weight_decay': 0.0},
-            {'params': [p for n, p in model.module.named_parameters() if 'feature_extractor' not in n and not any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in model.named_parameters() if 'feature_extractor' not in n and not any(nd in n for nd in no_decay)],
              'lr': self.args.classifier_learning_rate, 'weight_decay': 1e-2},
-            {'params': [p for n, p in model.module.named_parameters() if 'feature_extractor' not in n and any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in model.named_parameters() if 'feature_extractor' not in n and any(nd in n for nd in no_decay)],
              'lr': self.args.classifier_learning_rate, 'weight_decay': 0.0},
         ]
         self.optimizer = AdamW(parameters)
 
         progress_bar = tqdm(range(max_steps))
 
-        # for name, param in model.module.named_parameters():
+        # for name, param in model.named_parameters():
         #     if param.requires_grad:
         #         print(name)
 
         for epoch in range(self.args.num_train_epochs):
-            model.module.train()
+            model.train()
             for step, inputs in enumerate(train_dataloader):
                 self.optimizer.zero_grad()
 
                 inputs = {k: v.to(self.args.device) for k, v in inputs.items()}
-                outputs = model.module(**inputs)
+                outputs = model(**inputs)
                 loss = outputs.loss
                 loss.backward()
-                nn.utils.clip_grad_norm_(model.module.parameters(), self.args.max_grad_norm)
+                nn.utils.clip_grad_norm_(model.parameters(), self.args.max_grad_norm)
 
                 self.optimizer.step()
 
@@ -166,12 +166,12 @@ class ExpertTrainer:
         golds = []
         preds = []
 
-        model.module.eval()
+        model.eval()
         for step, inputs in enumerate(eval_dataloader):
             labels = inputs.pop('labels')
             inputs = {k: v.to(self.args.device) for k, v in inputs.items()}
 
-            outputs = model.module(**inputs)
+            outputs = model(**inputs)
 
             logits = outputs.logits
 
@@ -191,8 +191,8 @@ class ExpertTrainer:
         return micro_f1
 
     def save_model(self, model, save_path):
-        bert_state_dict = model.module.feature_extractor.bert.state_dict()
-        linear_state_dict = model.module.classifier.state_dict()
+        bert_state_dict = model.feature_extractor.bert.state_dict()
+        linear_state_dict = model.classifier.state_dict()
         torch.save({
             "model": bert_state_dict,
             "linear": linear_state_dict,
