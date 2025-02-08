@@ -56,7 +56,7 @@ class ExpertTrainer:
             )
             train_dataset = BaseDataset(train_data)
 
-            model.new_task(num_train_labels)
+            model.module.new_task(num_train_labels)
 
             self.train(
                 model=model,
@@ -110,25 +110,25 @@ class ExpertTrainer:
 
         no_decay = ["bias", "LayerNorm.weight"]
         parameters = [
-            {'params': [p for n, p in model.named_parameters() if 'feature_extractor' in n and not any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in model.module.named_parameters() if 'feature_extractor' in n and not any(nd in n for nd in no_decay)],
              'lr': self.args.learning_rate, 'weight_decay': 1e-2},
-            {'params': [p for n, p in model.named_parameters() if 'feature_extractor' in n and any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in model.module.named_parameters() if 'feature_extractor' in n and any(nd in n for nd in no_decay)],
              'lr': self.args.learning_rate, 'weight_decay': 0.0},
-            {'params': [p for n, p in model.named_parameters() if 'feature_extractor' not in n and not any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in model.module.named_parameters() if 'feature_extractor' not in n and not any(nd in n for nd in no_decay)],
              'lr': self.args.classifier_learning_rate, 'weight_decay': 1e-2},
-            {'params': [p for n, p in model.named_parameters() if 'feature_extractor' not in n and any(nd in n for nd in no_decay)],
+            {'params': [p for n, p in model.module.named_parameters() if 'feature_extractor' not in n and any(nd in n for nd in no_decay)],
              'lr': self.args.classifier_learning_rate, 'weight_decay': 0.0},
         ]
         self.optimizer = AdamW(parameters)
 
         progress_bar = tqdm(range(max_steps))
 
-        # for name, param in model.named_parameters():
+        # for name, param in model.module.named_parameters():
         #     if param.requires_grad:
         #         print(name)
 
         for epoch in range(self.args.num_train_epochs):
-            model.train()
+            model.module.train()
             for step, inputs in enumerate(train_dataloader):
                 self.optimizer.zero_grad()
 
@@ -136,7 +136,7 @@ class ExpertTrainer:
                 outputs = model(**inputs)
                 loss = outputs.loss
                 loss.backward()
-                nn.utils.clip_grad_norm_(model.parameters(), self.args.max_grad_norm)
+                nn.utils.clip_grad_norm_(model.module.parameters(), self.args.max_grad_norm)
 
                 self.optimizer.step()
 
@@ -166,7 +166,7 @@ class ExpertTrainer:
         golds = []
         preds = []
 
-        model.eval()
+        model.module.eval()
         for step, inputs in enumerate(eval_dataloader):
             labels = inputs.pop('labels')
             inputs = {k: v.to(self.args.device) for k, v in inputs.items()}
@@ -191,8 +191,8 @@ class ExpertTrainer:
         return micro_f1
 
     def save_model(self, model, save_path):
-        bert_state_dict = model.feature_extractor.bert.state_dict()
-        linear_state_dict = model.classifier.state_dict()
+        bert_state_dict = model.module.feature_extractor.bert.state_dict()
+        linear_state_dict = model.module.classifier.state_dict()
         torch.save({
             "model": bert_state_dict,
             "linear": linear_state_dict,
