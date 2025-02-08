@@ -130,6 +130,12 @@ class ExpertTrainer:
         for epoch in range(self.args.num_train_epochs):
             model.module.train()
             for step, inputs in enumerate(train_dataloader):
+                
+                if isinstance(model, torch.nn.DataParallel):
+                    print("model.device_ids:", model.device_ids)
+                os.system("nvidia-smi")
+                
+                
                 self.optimizer.zero_grad()
 
                 inputs = {k: v.to(self.args.device) for k, v in inputs.items()}
@@ -168,8 +174,6 @@ class ExpertTrainer:
 
         model.module.eval()
         for step, inputs in enumerate(eval_dataloader):
-            if isinstance(model, torch.nn.DataParallel):
-                print("model.device_ids:", model.device_ids)
             labels = inputs.pop('labels')
             inputs = {k: v.to(self.args.device) for k, v in inputs.items()}
 
