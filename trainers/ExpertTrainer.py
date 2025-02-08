@@ -76,7 +76,7 @@ class ExpertTrainer:
             save_model_name = f"{self.args.dataset_name}_{seed}_{self.args.augment_type}.pth"
             save_model_path = os.path.join(self.args.save_model_dir, save_model_name)
             logger.info(f"save expert model to {save_model_path}")
-            self.save_model(model, save_model_path)
+            self.save_model(model.module, save_model_path)
 
             all_cur_acc[self.task_idx] = cur_result
             all_total_acc[self.task_idx] = cur_result
@@ -168,6 +168,8 @@ class ExpertTrainer:
 
         model.module.eval()
         for step, inputs in enumerate(eval_dataloader):
+            if isinstance(model, torch.nn.DataParallel):
+                print("model.device_ids:", model.device_ids)
             labels = inputs.pop('labels')
             inputs = {k: v.to(self.args.device) for k, v in inputs.items()}
 
